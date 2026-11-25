@@ -38,7 +38,7 @@ export default async function ConnexionPage({ searchParams }: { searchParams: Pr
             </p>
           )}
           <LoginForm />
-          <p className="mt-6 text-center text-xs text-ink/75">Pas de mot de passe : tu reçois un lien de connexion par email.</p>
+          <p className="mt-6 text-center text-xs text-ink/75">Par lien email ou avec ton mot de passe.</p>
         </div>
       </section>
     </main>

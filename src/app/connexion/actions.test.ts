@@ -1,11 +1,17 @@
-import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-const signInWithOtp = vi.fn();
-vi.mock('@/lib/supabase/server', () => ({
-  createServerSupabase: async () => ({ auth: { signInWithOtp } }),
+const { signInWithOtp, signInWithPassword, rpc, redirect } = vi.hoisted(() => ({
+  signInWithOtp: vi.fn(),
+  signInWithPassword: vi.fn(),
+  rpc: vi.fn(),
+  redirect: vi.fn(),
 }));
+vi.mock('@/lib/supabase/server', () => ({
+  createServerSupabase: async () => ({ auth: { signInWithOtp, signInWithPassword }, rpc }),
+}));
+vi.mock('next/navigation', () => ({ redirect }));
 
-import { sendMagicLink } from './actions';
+import { sendMagicLink, signInWithPassword as signInWithPassword_ } from './actions';
 
 beforeEach(() => {
   signInWithOtp.mockReset();
@@ -66,4 +72,48 @@ test('signale une erreur d’envoi', async () => {
   const fd = new FormData();
   fd.set('email', 'arthur@example.com');
   expect(await sendMagicLink(fd)).toEqual({ ok: false, error: "Le lien n'a pas pu être envoyé. Réessaie dans une minute." });
+});
+
+describe('connexion avec mot de passe', () => {
+  const pwForm = (email: string, password: string) => {
+    const fd = new FormData();
+    fd.set('email', email);
+    fd.set('password', password);
+    return fd;
+  };
+
+  beforeEach(() => {
+    signInWithPassword.mockReset().mockResolvedValue({ error: null });
+    rpc.mockReset().mockResolvedValue({ data: 3, error: null });
+    redirect.mockReset();
+  });
+
+  test('bon mot de passe : comptes créés puis accueil', async () => {
+    await signInWithPassword_(pwForm(' Arthur@example.com ', 'un-mot-de-passe'));
+    expect(signInWithPassword).toHaveBeenCalledWith({ email: 'arthur@example.com', password: 'un-mot-de-passe' });
+    expect(rpc).toHaveBeenCalledWith('seed_default_accounts');
+    expect(redirect).toHaveBeenCalledWith('/');
+  });
+
+  test('mauvais mot de passe : message clair, pas de redirection', async () => {
+    signInWithPassword.mockResolvedValue({ error: { message: 'Invalid login credentials' } });
+    expect(await signInWithPassword_(pwForm('arthur@example.com', 'faux-mot-de-passe'))).toEqual({
+      ok: false,
+      error: 'Email ou mot de passe incorrect.',
+    });
+    expect(redirect).not.toHaveBeenCalled();
+  });
+
+  test('adresse non autorisée : refusée sans appeler Supabase', async () => {
+    expect(await signInWithPassword_(pwForm('inconnu@example.com', 'un-mot-de-passe'))).toEqual({
+      ok: false,
+      error: "Cette adresse n'a pas accès à Minice Studio Clip.",
+    });
+    expect(signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  test('mot de passe vide : refusé', async () => {
+    expect((await signInWithPassword_(pwForm('arthur@example.com', ''))).ok).toBe(false);
+    expect(signInWithPassword).not.toHaveBeenCalled();
+  });
 });
