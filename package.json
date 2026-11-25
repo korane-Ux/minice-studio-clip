@@ -11,6 +11,7 @@
     "test:db": "./scripts/test-db.sh"
   },
   "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.15",
     "@fontsource/poppins": "^5.3.0",
     "@fontsource/roboto-mono": "^5.3.0",
     "@supabase/ssr": "^0.12.7",

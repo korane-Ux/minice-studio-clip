@@ -2,9 +2,11 @@ import { notFound } from 'next/navigation';
 import { AppShell } from '@/components/shell/AppShell';
 import { IdeaStep, ScriptStep } from '@/components/studio/IdeaScriptSteps';
 import { ScenesStep } from '@/components/studio/ScenesStep';
+import { SummaryStep } from '@/components/studio/SummaryStep';
+import { MontageContainer, ValidationStep } from '@/components/studio/ValidationStep';
 import { currentStep, Stepper } from '@/components/studio/Stepper';
 import { ideaSchema } from '@/lib/ai/schemas';
-import { ideasStep, scriptStep } from '@/lib/ai/steps';
+import { ideasStep, scriptStep, summaryStep } from '@/lib/ai/steps';
 import { loadEpisode } from '@/lib/episodes/load';
 import { requireUser } from '@/lib/supabase/server';
 
@@ -21,6 +23,26 @@ export default async function EpisodePage({ params }: { params: Promise<{ id: st
     const { data } = await supabase.storage.from('refs').createSignedUrls(refPaths, 3600);
     for (const s of data ?? []) if (s.path && s.signedUrl) refUrls[s.path] = s.signedUrl;
   }
+
+  const clipUrls: Record<string, string> = {};
+  const clipPaths = scenes.map((s) => s.clipPath).filter((p): p is string => !!p);
+  if (episode.status === 'montage' && clipPaths.length) {
+    const { data } = await supabase.storage.from('clips').createSignedUrls(clipPaths, 3600);
+    for (const s of data ?? []) if (s.path && s.signedUrl) clipUrls[s.path] = s.signedUrl;
+  }
+  let videoUrl: string | null = null;
+  if (episode.status === 'a_valider' && episode.videoPath) {
+    const { data } = await supabase.storage.from('videos').createSignedUrl(episode.videoPath, 3600);
+    videoUrl = data?.signedUrl ?? null;
+  }
+  const names = new Map(characters.map((c) => [c.id, c.name]));
+  const script = {
+    title: episode.title,
+    lesson: episode.lesson,
+    caption: episode.caption,
+    hashtags: episode.hashtags,
+    scenes: scenes.map((s) => ({ visual: s.visual, dialogue: s.dialogue, durationS: s.durationS, characters: s.characterIds.map((id) => names.get(id) ?? '') })),
+  };
 
   const chosen = ideaSchema.safeParse(episode.idea);
   const step = currentStep(episode.status, chosen.success);
@@ -44,6 +66,21 @@ export default async function EpisodePage({ params }: { params: Promise<{ id: st
         )}
         {step === 2 && (
           <ScenesStep episodeId={episode.id} userId={user.id} scenes={scenes} characters={characters} refUrls={refUrls} lesson={episode.lesson} />
+        )}
+        {step === 3 && (
+          <MontageContainer
+            episodeId={episode.id}
+            userId={user.id}
+            lesson={episode.lesson}
+            scenes={scenes.map((s) => ({ id: s.id, position: s.position, startS: s.startS, durationS: s.durationS, dialogue: s.dialogue, clipPath: s.clipPath ?? '', clipUrl: s.clipPath ? (clipUrls[s.clipPath] ?? '') : '' }))}
+          />
+        )}
+        {step === 4 && <ValidationStep episodeId={episode.id} videoUrl={videoUrl} scenes={scenes.map((s) => ({ id: s.id, position: s.position }))} />}
+        {(episode.status === 'valide' || episode.status === 'publie') && (
+          <SummaryStep episodeId={episode.id} accountId={account.id} prompt={summaryStep.buildPrompt({ ctx, script })} />
+        )}
+        {episode.status === 'rejete' && (
+          <p className="rounded-card border border-line bg-surface p-5 text-muted">Cet épisode a été rejeté. Lance une nouvelle idée depuis l&apos;accueil.</p>
         )}
       </main>
     </AppShell>

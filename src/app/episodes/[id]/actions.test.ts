@@ -9,7 +9,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
-import { chooseIdea, importScript } from './actions';
+import { chooseIdea, importScript, saveVideo, updateSummary } from './actions';
 
 beforeEach(() => {
   rpc.mockReset();
@@ -25,6 +25,18 @@ test('réponse illisible : rien n’est envoyé à la base', async () => {
 
 test('idée incomplète refusée sans écriture', async () => {
   const r = await chooseIdea('ep1', { title: '', pitch: 'p', lesson: 'l' });
+  expect(r.ok).toBe(false);
+  expect(from).not.toHaveBeenCalled();
+});
+
+test('vidéo d’un autre utilisateur refusée', async () => {
+  const r = await saveVideo('ep1', 'u2/ep1.mp4');
+  expect(r).toEqual({ ok: false, error: 'Chemin de vidéo invalide.' });
+  expect(from).not.toHaveBeenCalled();
+});
+
+test('résumé illisible : rien n’est écrit', async () => {
+  const r = await updateSummary('acc1', 'pas de json');
   expect(r.ok).toBe(false);
   expect(from).not.toHaveBeenCalled();
 });
