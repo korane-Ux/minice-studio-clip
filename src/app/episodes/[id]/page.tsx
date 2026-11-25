@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { AppShell } from '@/components/shell/AppShell';
 import { IdeaStep, ScriptStep } from '@/components/studio/IdeaScriptSteps';
+import { ScenesStep } from '@/components/studio/ScenesStep';
 import { currentStep, Stepper } from '@/components/studio/Stepper';
 import { ideaSchema } from '@/lib/ai/schemas';
 import { ideasStep, scriptStep } from '@/lib/ai/steps';
@@ -9,10 +10,17 @@ import { requireUser } from '@/lib/supabase/server';
 
 export default async function EpisodePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
   const bundle = await loadEpisode(supabase, id);
   if (!bundle) notFound();
-  const { episode, account, ctx } = bundle;
+  const { episode, account, ctx, scenes, characters } = bundle;
+
+  const refPaths = characters.map((c) => c.refImagePath).filter((p): p is string => !!p);
+  const refUrls: Record<string, string> = {};
+  if (refPaths.length) {
+    const { data } = await supabase.storage.from('refs').createSignedUrls(refPaths, 3600);
+    for (const s of data ?? []) if (s.path && s.signedUrl) refUrls[s.path] = s.signedUrl;
+  }
 
   const chosen = ideaSchema.safeParse(episode.idea);
   const step = currentStep(episode.status, chosen.success);
@@ -33,6 +41,9 @@ export default async function EpisodePage({ params }: { params: Promise<{ id: st
         {step === 0 && <IdeaStep episodeId={episode.id} prompt={ideasStep.buildPrompt({ ctx, hint: episode.idea.hint })} />}
         {step === 1 && chosen.success && (
           <ScriptStep episodeId={episode.id} idea={chosen.data} prompt={scriptStep.buildPrompt({ ctx, idea: chosen.data })} />
+        )}
+        {step === 2 && (
+          <ScenesStep episodeId={episode.id} userId={user.id} scenes={scenes} characters={characters} refUrls={refUrls} lesson={episode.lesson} />
         )}
       </main>
     </AppShell>

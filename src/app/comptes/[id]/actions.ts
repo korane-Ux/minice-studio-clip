@@ -1,7 +1,8 @@
 'use server';
 import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/supabase/server';
-import { accountFromForm, accountUpdateSchema, characterSchema, validateRefImage } from '@/lib/validation/account';
+import { accountFromForm, accountUpdateSchema, characterSchema } from '@/lib/validation/account';
+import { isOwnPath } from '@/lib/video/clipFile';
 
 export type FormResult = { ok: true; message?: string } | { ok: false; error: string };
 
@@ -38,25 +39,17 @@ export async function updateAccount(id: string, fd: FormData): Promise<FormResul
   return { ok: true, message: 'Bible enregistrée.' };
 }
 
-export async function upsertCharacter(accountId: string, fd: FormData): Promise<FormResult> {
-  const { supabase, user } = await requireUser();
+export async function upsertCharacter(accountId: string, fd: FormData): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const { supabase } = await requireUser();
   const parsed = characterSchema.safeParse({ name: fd.get('name'), description: fd.get('description') ?? '', color: fd.get('color') });
   if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
 
-  const file = fd.get('image');
-  const hasFile = file instanceof File && file.size > 0;
-  let ext: string | null = null;
-  if (hasFile) {
-    const check = validateRefImage(file);
-    if (!check.ok) return check;
-    ext = check.ext;
-  }
-
   const existingId = String(fd.get('id') ?? '') || null;
-  let characterId = existingId;
+  let characterId: string;
   if (existingId) {
     const { error } = await supabase.from('characters').update(parsed.data).eq('id', existingId);
     if (error) return { ok: false, error: "L'enregistrement a échoué. Réessaie." };
+    characterId = existingId;
   } else {
     const { count } = await supabase.from('characters').select('id', { count: 'exact', head: true }).eq('account_id', accountId);
     const { data, error } = await supabase
@@ -67,16 +60,18 @@ export async function upsertCharacter(accountId: string, fd: FormData): Promise<
     if (error || !data) return { ok: false, error: "L'ajout a échoué. Réessaie." };
     characterId = data.id;
   }
-
-  if (hasFile && characterId && ext) {
-    const path = `${user.id}/${characterId}.${ext}`;
-    const { error } = await supabase.storage.from('refs').upload(path, file, { upsert: true, contentType: file.type });
-    if (error) return { ok: false, error: "L'image n'a pas pu être envoyée." };
-    await supabase.from('characters').update({ ref_image_path: path }).eq('id', characterId);
-  }
-
   revalidatePath(`/comptes/${accountId}`);
-  return { ok: true, message: 'Personnage enregistré.' };
+  return { ok: true, id: characterId };
+}
+
+// Appelé après l'envoi direct de l'image vers le bucket refs (voir src/lib/storage/upload.ts).
+export async function setCharacterImage(characterId: string, path: string, accountId: string): Promise<FormResult> {
+  const { supabase, user } = await requireUser();
+  if (!isOwnPath(path, `${user.id}/${characterId}.`)) return { ok: false, error: 'Chemin d’image invalide.' };
+  const { error } = await supabase.from('characters').update({ ref_image_path: path }).eq('id', characterId);
+  if (error) return { ok: false, error: "L'image n'a pas pu être enregistrée." };
+  revalidatePath(`/comptes/${accountId}`);
+  return { ok: true };
 }
 
 export async function deleteCharacter(id: string, accountId: string): Promise<FormResult> {

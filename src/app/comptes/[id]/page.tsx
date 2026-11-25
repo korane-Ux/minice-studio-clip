@@ -1,15 +1,15 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AccountForm } from '@/components/bible/AccountForm';
-import { CharacterCard } from '@/components/bible/CharacterCard';
+import { CharacterSection } from '@/components/bible/CharacterSection';
 import { AppShell } from '@/components/shell/AppShell';
 import { STYLE_LABELS, toAccount, toCharacter } from '@/lib/domain/types';
 import { requireUser } from '@/lib/supabase/server';
-import { deleteCharacter, updateAccount, upsertCharacter } from './actions';
+import { updateAccount } from './actions';
 
 export default async function BiblePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { supabase } = await requireUser();
+  const { supabase, user } = await requireUser();
 
   const [{ data: accountRows }, { data: characterRows }] = await Promise.all([
     supabase.from('accounts').select('*').order('position'),
@@ -21,10 +21,10 @@ export default async function BiblePage({ params }: { params: Promise<{ id: stri
   const characters = (characterRows ?? []).map(toCharacter);
 
   const paths = characters.map((c) => c.refImagePath).filter((p): p is string => !!p);
-  const urls = new Map<string, string>();
+  const urls: Record<string, string> = {};
   if (paths.length) {
     const { data } = await supabase.storage.from('refs').createSignedUrls(paths, 3600);
-    for (const s of data ?? []) if (s.path && s.signedUrl) urls.set(s.path, s.signedUrl);
+    for (const s of data ?? []) if (s.path && s.signedUrl) urls[s.path] = s.signedUrl;
   }
 
   return (
@@ -57,18 +57,7 @@ export default async function BiblePage({ params }: { params: Promise<{ id: stri
           <h2 id="perso-titre" className="text-lg font-semibold">
             Personnages
           </h2>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
-            {characters.map((c) => (
-              <CharacterCard
-                key={c.id}
-                character={c}
-                imageUrl={c.refImagePath ? (urls.get(c.refImagePath) ?? null) : null}
-                onSave={upsertCharacter.bind(null, account.id)}
-                onDelete={deleteCharacter.bind(null, c.id, account.id)}
-              />
-            ))}
-            <CharacterCard key={`new-${characters.length}`} character={null} imageUrl={null} onSave={upsertCharacter.bind(null, account.id)} />
-          </div>
+          <CharacterSection accountId={account.id} userId={user.id} characters={characters} imageUrls={urls} />
         </section>
 
         <AccountForm account={account} hasApiKeys={false} action={updateAccount.bind(null, account.id)} />

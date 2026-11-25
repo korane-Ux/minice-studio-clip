@@ -1,27 +1,56 @@
 'use client';
-import { useActionState, useState } from 'react';
+import { useState, useTransition, type FormEvent } from 'react';
 import type { FormResult } from '@/app/comptes/[id]/actions';
 import type { Character } from '@/lib/domain/types';
+import { validateRefImage } from '@/lib/validation/account';
 
 const field = 'min-h-11 rounded-ctrl border border-line bg-surface-2 px-3 text-sm text-text';
+
+export type SaveResult = { ok: true; id: string } | { ok: false; error: string };
 
 export function CharacterCard({
   character,
   imageUrl,
   onSave,
+  onImage,
   onDelete,
 }: {
   character: Character | null;
   imageUrl: string | null;
-  onSave: (fd: FormData) => Promise<FormResult>;
+  onSave: (fd: FormData) => Promise<SaveResult>;
+  onImage: (characterId: string, file: File, ext: 'png' | 'jpg' | 'webp') => Promise<FormResult>;
   onDelete?: () => Promise<FormResult>;
 }) {
   const [editing, setEditing] = useState(character === null);
-  const [state, submit, pending] = useActionState<FormResult | null, FormData>(async (_p, fd) => {
-    const r = await onSave(fd);
-    if (r.ok && character) setEditing(false);
-    return r;
-  }, null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    // Fichier lu sur le champ lui-même (FormData le recopie mal dans certains environnements).
+    const file = (form.querySelector('input[name=image]') as HTMLInputElement | null)?.files?.[0] ?? null;
+    fd.delete('image');
+    const hasFile = !!file && file.size > 0;
+    let ext: 'png' | 'jpg' | 'webp' | null = null;
+    if (hasFile) {
+      const check = validateRefImage(file!);
+      if (!check.ok) return setError(check.error);
+      ext = check.ext;
+    }
+    start(async () => {
+      const saved = await onSave(fd);
+      if (!saved.ok) return setError(saved.error);
+      if (hasFile && ext) {
+        const img = await onImage(saved.id, file!, ext);
+        if (!img.ok) return setError(img.error);
+      }
+      if (character) setEditing(false);
+      else form.reset();
+    });
+  }
 
   if (!editing && character) {
     return (
@@ -56,7 +85,7 @@ export function CharacterCard({
   }
 
   return (
-    <form action={submit} className="flex flex-col gap-3 rounded-card border border-dashed border-line bg-surface-2 p-4">
+    <form onSubmit={submit} className="flex flex-col gap-3 rounded-card border border-dashed border-line bg-surface-2 p-4">
       {character && <input type="hidden" name="id" value={character.id} />}
       <label className="flex flex-col gap-1 text-sm font-semibold text-muted">
         Nom
@@ -76,9 +105,9 @@ export function CharacterCard({
           <input type="file" name="image" accept="image/png,image/jpeg,image/webp" className="text-sm text-text" />
         </label>
       </div>
-      {state && !state.ok && (
+      {error && (
         <p role="alert" className="text-sm text-danger">
-          {state.error}
+          {error}
         </p>
       )}
       <div className="flex gap-2">
