@@ -1,5 +1,7 @@
 'use client';
 import { useState } from 'react';
+import { MontageClipError, montageErrorMessage } from '@/lib/montage/errors';
+import type { MontageRun } from '@/lib/montage/runner';
 import { buildAss } from '@/lib/montage/subtitles';
 
 async function defaultFetchClip(url: string): Promise<Uint8Array> {
@@ -19,7 +21,7 @@ export function MontageStep({
 }: {
   lesson: string;
   scenes: MontageScene[];
-  run: (clips: { name: string; data: Uint8Array }[], ass: string, onProgress: (r: number) => void) => Promise<Blob>;
+  run: MontageRun;
   onSave: (video: Blob) => Promise<{ ok: true } | { ok: false; error: string }>;
   fetchClip?: (url: string) => Promise<Uint8Array>;
 }) {
@@ -35,15 +37,17 @@ export function MontageStep({
       const clips = await Promise.all(
         scenes.map(async (s) => {
           const ext = s.clipPath.split('.').pop() ?? 'mp4';
-          const data = await fetchClip(s.clipUrl);
-          return { name: `scene${s.position}.${ext}`, data };
+          const data = await fetchClip(s.clipUrl).catch(() => {
+            throw new MontageClipError(s.position, 'download');
+          });
+          return { name: `scene${s.position}.${ext}`, data, durationS: s.durationS, position: s.position };
         }),
       );
       const video = await run(clips, buildAss(scenes, lesson), setProgress);
       const saved = await onSave(video);
       if (!saved.ok) setError(saved.error);
-    } catch {
-      setError('Le montage a échoué. Réessaie depuis un ordinateur.');
+    } catch (e) {
+      setError(montageErrorMessage(e));
     } finally {
       setBusy(false);
     }

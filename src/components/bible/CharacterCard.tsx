@@ -1,6 +1,7 @@
 'use client';
 import { useState, useTransition, type FormEvent } from 'react';
 import type { FormResult } from '@/app/comptes/[id]/actions';
+import { ConfirmButton } from '@/components/ui/ConfirmButton';
 import type { Character } from '@/lib/domain/types';
 import { validateRefImage } from '@/lib/validation/account';
 
@@ -74,11 +75,26 @@ export function CharacterCard({
               Modifier
             </button>
             {onDelete && (
-              <button type="button" onClick={() => onDelete()} className="min-h-10 rounded-full px-4 text-sm text-danger">
-                Supprimer
-              </button>
+              <ConfirmButton
+                label="Supprimer"
+                confirmLabel="Oui, supprimer"
+                question={`Supprimer ${character.name} et son image ?`}
+                disabled={pending}
+                onConfirm={() =>
+                  start(async () => {
+                    setError(null);
+                    const r = await onDelete();
+                    if (!r.ok) setError(r.error);
+                  })
+                }
+              />
             )}
           </div>
+          {error && (
+            <p role="alert" className="text-sm text-danger">
+              {error}
+            </p>
+          )}
         </div>
       </article>
     );

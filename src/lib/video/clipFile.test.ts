@@ -3,7 +3,8 @@ import { clipPath, isOwnPath, validateClipFile } from './clipFile';
 
 test('formats de clip', () => {
   expect(validateClipFile({ name: 'a.avi', type: 'video/x-msvideo', size: 1e6 })).toEqual({ ok: false, error: 'Format refusé : MP4, WebM ou MOV uniquement.' });
-  expect(validateClipFile({ name: 'a.mp4', type: 'video/mp4', size: 500 * 1024 * 1024 })).toEqual({ ok: false, error: 'Clip trop lourd : 200 Mo maximum.' });
+  expect(validateClipFile({ name: 'a.mp4', type: 'video/mp4', size: 51 * 1024 * 1024 })).toEqual({ ok: false, error: 'Clip trop lourd : 50 Mo maximum.' });
+  expect(validateClipFile({ name: 'a.mp4', type: 'video/mp4', size: 50 * 1024 * 1024 })).toEqual({ ok: true, ext: 'mp4' });
   expect(validateClipFile({ name: 'a.MOV', type: 'video/quicktime', size: 3e7 })).toEqual({ ok: true, ext: 'mov' });
   expect(validateClipFile({ name: 'scene.webm', type: 'video/webm', size: 1e6 })).toEqual({ ok: true, ext: 'webm' });
 });

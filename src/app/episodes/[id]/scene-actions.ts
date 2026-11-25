@@ -28,12 +28,14 @@ export async function registerClip(sceneId: string, path: string): Promise<ClipR
   const { supabase, user } = await requireUser();
   const found = await sceneAndEpisode(supabase, sceneId);
   if (!found) return { ok: false, error: 'Scène introuvable.' };
-  const { episode } = found;
+  const { scene, episode } = found;
   if (episode.status !== 'scenes' && episode.status !== 'montage') return { ok: false, error: "Cet épisode n'est plus à l'étape des scènes." };
   if (!isOwnPath(path, `${user.id}/${episode.id}/${sceneId}.`)) return { ok: false, error: 'Chemin de clip invalide.' };
 
   const { error } = await supabase.from('scenes').update({ clip_path: path }).eq('id', sceneId);
   if (error) return { ok: false, error: "Le clip n'a pas pu être enregistré." };
+  // Remplacement avec une autre extension : l'ancien fichier occuperait le stockage pour rien.
+  if (scene.clip_path && scene.clip_path !== path) await supabase.storage.from('clips').remove([scene.clip_path]);
   return refreshStatus(supabase, episode.id, episode.status);
 }
 

@@ -32,18 +32,29 @@ test('scène sans dialogue : pas de ligne de sous-titre', () => {
 });
 
 test('normalisation d’un clip sans audio', () => {
-  const args = buildNormalizeArgs('s1.mov', 'n1.mp4', false);
+  const args = buildNormalizeArgs('s1.mov', 'n1.mp4', false, 6);
   expect(args).toContain('anullsrc=channel_layout=stereo:sample_rate=44100');
   expect(args.join(' ')).toContain('scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280');
-  expect(args).toContain('-shortest');
   expect(args.at(-1)).toBe('n1.mp4');
 });
 
 test('normalisation d’un clip avec audio', () => {
-  const args = buildNormalizeArgs('s1.mp4', 'n1.mp4', true);
+  const args = buildNormalizeArgs('s1.mp4', 'n1.mp4', true, 6);
   expect(args).not.toContain('anullsrc=channel_layout=stereo:sample_rate=44100');
   expect(args.slice(0, 2)).toEqual(['-i', 's1.mp4']);
   expect(args).toContain('veryfast');
+});
+
+// Les sous-titres sont calés sur les durées du script : chaque clip doit durer exactement sa durée prévue.
+test('chaque clip est coupé ou prolongé à sa durée prévue', () => {
+  for (const hasAudio of [true, false]) {
+    const args = buildNormalizeArgs('s1.mp4', 'n1.mp4', hasAudio, 6);
+    expect(args.slice(args.indexOf('-t'), args.indexOf('-t') + 2)).toEqual(['-t', '6']);
+    expect(args[args.indexOf('-vf') + 1]).toMatch(/,tpad=stop_mode=clone:stop_duration=6$/);
+    expect(args).not.toContain('-shortest');
+  }
+  const withAudio = buildNormalizeArgs('s1.mp4', 'n1.mp4', true, 6);
+  expect(withAudio[withAudio.indexOf('-af') + 1]).toBe('apad');
 });
 
 test('assemblage avec sous-titres', () => {

@@ -5,14 +5,18 @@ const AAC = ['-c:a', 'aac', '-ar', '44100', '-ac', '2'];
 
 // Chaque clip est ramené au même format ; une piste muette est ajoutée s'il n'a pas de son,
 // pour que l'assemblage (concat) reçoive partout une vidéo et un audio identiques.
-export function buildNormalizeArgs(input: string, output: string, hasAudio: boolean): string[] {
-  if (hasAudio) return ['-i', input, '-vf', VIDEO_FILTER, ...H264, ...AAC, output];
+// Il dure exactement la durée prévue par le script (les sous-titres sont calés dessus) :
+// trop long, il est coupé ; trop court, sa dernière image est prolongée et le son complété par du silence.
+export function buildNormalizeArgs(input: string, output: string, hasAudio: boolean, durationS: number): string[] {
+  const d = String(durationS);
+  const vf = `${VIDEO_FILTER},tpad=stop_mode=clone:stop_duration=${d}`;
+  if (hasAudio) return ['-i', input, '-map', '0:v:0', '-map', '0:a:0', '-vf', vf, '-af', 'apad', ...H264, ...AAC, '-t', d, output];
   return [
     '-i', input,
     '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
     '-map', '0:v:0', '-map', '1:a:0',
-    '-vf', VIDEO_FILTER, ...H264, ...AAC,
-    '-shortest', output,
+    '-vf', vf, ...H264, ...AAC,
+    '-t', d, output,
   ];
 }
 

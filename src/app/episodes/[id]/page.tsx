@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { AppShell } from '@/components/shell/AppShell';
+import { AbandonEpisode } from '@/components/studio/AbandonEpisode';
 import { IdeaStep, ScriptStep } from '@/components/studio/IdeaScriptSteps';
 import { ScenesStep } from '@/components/studio/ScenesStep';
 import { SummaryStep } from '@/components/studio/SummaryStep';
@@ -68,16 +69,25 @@ export default async function EpisodePage({ params }: { params: Promise<{ id: st
           <ScenesStep episodeId={episode.id} userId={user.id} scenes={scenes} characters={characters} refUrls={refUrls} lesson={episode.lesson} />
         )}
         {step === 3 && (
-          <MontageContainer
-            episodeId={episode.id}
-            userId={user.id}
-            lesson={episode.lesson}
-            scenes={scenes.map((s) => ({ id: s.id, position: s.position, startS: s.startS, durationS: s.durationS, dialogue: s.dialogue, clipPath: s.clipPath ?? '', clipUrl: s.clipPath ? (clipUrls[s.clipPath] ?? '') : '' }))}
-          />
+          <>
+            <MontageContainer
+              episodeId={episode.id}
+              userId={user.id}
+              lesson={episode.lesson}
+              scenes={scenes.map((s) => ({ id: s.id, position: s.position, startS: s.startS, durationS: s.durationS, dialogue: s.dialogue, clipPath: s.clipPath ?? '', clipUrl: s.clipPath ? (clipUrls[s.clipPath] ?? '') : '' }))}
+            />
+            {/* Un clip refusé par le montage se remplace ici, sans revenir en arrière. */}
+            <ScenesStep episodeId={episode.id} userId={user.id} scenes={scenes} characters={characters} refUrls={refUrls} lesson={episode.lesson} />
+          </>
         )}
         {step === 4 && <ValidationStep episodeId={episode.id} videoUrl={videoUrl} scenes={scenes.map((s) => ({ id: s.id, position: s.position }))} />}
         {(episode.status === 'valide' || episode.status === 'publie') && (
           <SummaryStep episodeId={episode.id} accountId={account.id} prompt={summaryStep.buildPrompt({ ctx, script })} />
+        )}
+        {(episode.status === 'idee' || episode.status === 'scenes' || episode.status === 'montage') && (
+          <footer className="border-t border-line pt-4">
+            <AbandonEpisode episodeId={episode.id} />
+          </footer>
         )}
         {episode.status === 'rejete' && (
           <p className="rounded-card border border-line bg-surface p-5 text-muted">Cet épisode a été rejeté. Lance une nouvelle idée depuis l&apos;accueil.</p>

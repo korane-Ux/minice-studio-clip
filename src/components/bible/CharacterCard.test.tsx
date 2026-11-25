@@ -15,6 +15,25 @@ test('image trop lourde : refusée avant tout envoi', async () => {
   expect(onSave).not.toHaveBeenCalled();
 });
 
+const gaspard = { id: 'ch1', accountId: 'a1', name: 'Gaspard', description: 'Un vieux crabe', color: '#F472B6', refImagePath: null, position: 0 };
+
+test('supprimer demande une confirmation', async () => {
+  const onDelete = vi.fn().mockResolvedValue({ ok: true });
+  render(<CharacterCard character={gaspard} imageUrl={null} onSave={vi.fn()} onImage={vi.fn()} onDelete={onDelete} />);
+  await userEvent.click(screen.getByRole('button', { name: 'Supprimer' }));
+  expect(onDelete).not.toHaveBeenCalled();
+  await userEvent.click(screen.getByRole('button', { name: 'Oui, supprimer' }));
+  await vi.waitFor(() => expect(onDelete).toHaveBeenCalledTimes(1));
+});
+
+test('suppression en échec : le message s’affiche', async () => {
+  const onDelete = vi.fn().mockResolvedValue({ ok: false, error: 'La suppression a échoué.' });
+  render(<CharacterCard character={gaspard} imageUrl={null} onSave={vi.fn()} onImage={vi.fn()} onDelete={onDelete} />);
+  await userEvent.click(screen.getByRole('button', { name: 'Supprimer' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Oui, supprimer' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('La suppression a échoué.');
+});
+
 test('enregistre puis envoie l’image directement', async () => {
   const onSave = vi.fn().mockResolvedValue({ ok: true, id: 'ch1' });
   const onImage = vi.fn().mockResolvedValue({ ok: true });

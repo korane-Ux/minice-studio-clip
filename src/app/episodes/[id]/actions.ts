@@ -6,6 +6,7 @@ import { scriptStep, summaryStep } from '@/lib/ai/steps';
 import { transition } from '@/lib/domain/status';
 import { toImportPayload } from '@/lib/episodes/importPayload';
 import { loadEpisode } from '@/lib/episodes/load';
+import { removeEpisodeFiles } from '@/lib/storage/cleanup';
 import { requireUser } from '@/lib/supabase/server';
 
 export type StepResult = { ok: true } | { ok: false; error: string };
@@ -70,8 +71,13 @@ export async function approveEpisode(episodeId: string): Promise<StepResult> {
   return setStatus(episodeId, { type: 'APPROVED' }, { validated_at: new Date().toISOString() });
 }
 
+// Rejeter ou abandonner : l'épisode reste dans la liste, ses fichiers sont supprimés.
 export async function rejectEpisode(episodeId: string): Promise<StepResult> {
-  return setStatus(episodeId, { type: 'REJECTED' });
+  const result = await setStatus(episodeId, { type: 'REJECTED' });
+  if (!result.ok) return result;
+  const { supabase } = await requireUser();
+  await removeEpisodeFiles(supabase, episodeId, { video: true });
+  return result;
 }
 
 export async function redoScene(episodeId: string, sceneId: string): Promise<StepResult> {

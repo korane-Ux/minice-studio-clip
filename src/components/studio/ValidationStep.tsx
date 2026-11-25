@@ -3,6 +3,7 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { approveEpisode, redoScene, rejectEpisode, saveVideo } from '@/app/episodes/[id]/actions';
 import { runMontage } from '@/lib/montage/runMontage';
+import { ConfirmButton } from '@/components/ui/ConfirmButton';
 import { uploadToBucket } from '@/lib/storage/upload';
 import { MontageStep, type MontageScene } from './MontageStep';
 
@@ -27,6 +28,7 @@ export function MontageContainer({ episodeId, userId, lesson, scenes }: { episod
 
 export function ValidationStep({ episodeId, videoUrl, scenes }: { episodeId: string; videoUrl: string | null; scenes: { id: string; position: number }[] }) {
   const [redo, setRedo] = useState(scenes[0]?.id ?? '');
+  const redoPosition = scenes.find((s) => s.id === redo)?.position ?? '';
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -66,13 +68,23 @@ export function ValidationStep({ episodeId, videoUrl, scenes }: { episodeId: str
               ))}
             </select>
           </label>
-          <button type="button" disabled={pending || !redo} onClick={() => act(() => redoScene(episodeId, redo))} className="min-h-10 rounded-full border border-line px-4 text-sm font-semibold">
-            Refaire cette scène
-          </button>
+          <ConfirmButton
+            label="Refaire cette scène"
+            confirmLabel={`Oui, refaire la scène ${redoPosition}`}
+            question="La vidéo montée sera supprimée et tu redéposeras un clip pour cette scène."
+            disabled={pending || !redo}
+            onConfirm={() => act(() => redoScene(episodeId, redo))}
+            className="min-h-11 rounded-full border border-line px-4 text-sm font-semibold"
+          />
         </div>
-        <button type="button" disabled={pending} onClick={() => act(() => rejectEpisode(episodeId))} className="min-h-10 self-start text-sm text-danger">
-          Rejeter l&apos;épisode
-        </button>
+        <ConfirmButton
+          label="Rejeter l'épisode"
+          confirmLabel="Oui, rejeter"
+          question="Les clips et la vidéo de cet épisode seront supprimés."
+          disabled={pending}
+          onConfirm={() => act(() => rejectEpisode(episodeId))}
+          className="min-h-11 self-start rounded-full px-4 text-sm text-danger"
+        />
         {error && (
           <p role="alert" className="text-sm text-danger">
             {error}

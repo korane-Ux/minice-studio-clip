@@ -1,6 +1,7 @@
 'use server';
 import { revalidatePath } from 'next/cache';
 import { transition } from '@/lib/domain/status';
+import { removeEpisodeFiles } from '@/lib/storage/cleanup';
 import { requireUser } from '@/lib/supabase/server';
 import { parseViews } from '@/lib/validation/views';
 
@@ -17,6 +18,7 @@ export async function markPublished(episodeId: string): Promise<Result> {
   }
   const { error } = await supabase.from('episodes').update({ status: 'publie', published_at: new Date().toISOString() }).eq('id', episodeId);
   if (error) return { ok: false, error: "L'enregistrement a échoué. Réessaie." };
+  await removeEpisodeFiles(supabase, episodeId, { video: false });
   revalidatePath('/publier');
   revalidatePath('/');
   return { ok: true };
