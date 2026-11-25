@@ -25,3 +25,14 @@ export async function loadEpisode(supabase: Supabase, episodeId: string): Promis
     ctx: { account, characters, summary: account.seriesSummary },
   };
 }
+
+// Compte + personnages, pour préparer les prompts et les imports d'un compte. null si introuvable.
+export async function loadAccountContext(supabase: Supabase, accountId: string): Promise<BibleContext | null> {
+  const [{ data: a }, { data: chars }] = await Promise.all([
+    supabase.from('accounts').select('*').eq('id', accountId).maybeSingle(),
+    supabase.from('characters').select('*').eq('account_id', accountId).order('position'),
+  ]);
+  if (!a) return null;
+  const account = toAccount(a);
+  return { account, characters: (chars ?? []).map(toCharacter), summary: account.seriesSummary };
+}
