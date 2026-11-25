@@ -1,0 +1,6 @@
+# Hébergement Netlify (offre gratuite). Netlify détecte Next.js et ajoute son adaptateur tout seul.
+[build]
+  command = "npm run build"
+
+[build.environment]
+  NODE_VERSION = "22"
