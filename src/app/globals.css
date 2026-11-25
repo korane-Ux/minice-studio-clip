@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+/* Thème sombre de Minice (minice-pearl.vercel.app) + couleurs des comptes. Miroir : src/lib/design/tokens.ts */
+@theme {
+  --color-canvas: #090f1c;
+  --color-surface: #101a2e;
+  --color-surface-2: #0d1526;
+  --color-line: #1e2c46;
+  --color-line-2: #182339;
+  --color-text: #eef1f8;
+  --color-muted: #9aa1b8;
+  --color-violet: #8880f0;
+  --color-violet-600: #6f65e8;
+  --color-violet-tint: #1c2440;
+  --color-ink: #0c182c;
+  --color-success: #1fa97a;
+  --color-danger: #e5484d;
+  --color-warning: #fbbf24;
+  --color-mer: #2dd4bf;
+  --color-paraboles: #fbbf24;
+  --color-marche: #f472b6;
+
+  --radius-card: 18px;
+  --radius-ctrl: 12px;
+
+  --font-sans: "Poppins", system-ui, sans-serif;
+  --font-mono: "Roboto Mono", ui-monospace, monospace;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
